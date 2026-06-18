@@ -8,8 +8,8 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/png" href="favicon.png" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css?v=3.6-company" />
-  <script src="i18n.js?v=3.6-company"></script>
+  <link rel="stylesheet" href="styles.css?v=3.6.2-tagline" />
+  <script src="i18n.js?v=3.6.2-tagline"></script>
 </head>
 <body>
   <div class="cloud-demo-banner" id="cloudDemoBanner">CLOUD DEMO · SAMPLE DATA · OWNER PRESENTATION VERSION</div>
@@ -17,8 +17,8 @@
     <div class="login-visual">
       <div class="pattern"></div>
       <div class="login-brand">
-        <img class="brand-logo login-logo" src="dar-al-sultan-logo.png" alt="Dar al Sultan logo" />
-        <span class="eyebrow">DAR AL SULTAN</span>
+        <img class="brand-logo login-logo" src="dar-al-sultan-logo.png" alt="Company logo" />
+        <span class="eyebrow" data-company-name></span>
         <h1>Business Intelligence<br>& Production Control</h1>
         <p>A secure cloud-ready CFO management system for finance, workshops, employees and multi-branch performance.</p>
         <div class="feature-pills">
@@ -30,7 +30,7 @@
       <form class="login-card" id="loginForm">
         <span class="eyebrow">SECURE ACCESS</span>
         <h2>Welcome back</h2>
-        <p>Sign in to the Dar al Sultan management application.</p>
+        <p data-company-tagline data-no-i18n>Sign in to the management application.</p>
         <label>Username<input name="username" autocomplete="username" value="admin" required /></label>
         <label>Password<input name="password" type="password" autocomplete="current-password" value="Admin@2026" required /></label>
         <button class="primary-btn full" type="submit">Sign In</button>
@@ -49,8 +49,8 @@
   <div class="app-shell hidden" id="appShell">
     <aside class="sidebar" id="sidebar">
       <div class="brand">
-        <img class="brand-logo sidebar-logo" src="dar-al-sultan-logo.png" alt="Dar al Sultan logo" />
-        <div><h1>Dar al Sultan</h1><p>CFO & Production</p></div>
+        <img class="brand-logo sidebar-logo" src="dar-al-sultan-logo.png" alt="Company logo" />
+        <div><h1 data-company-name>Dar al Sultan</h1><p>CFO & Production</p></div>
       </div>
       <nav class="nav" id="navigation">
         <button class="nav-item active" data-page="dashboard" data-permission="dashboard"><span>◫</span> Dashboard</button>
@@ -922,7 +922,7 @@
 
   <div class="confirm-modal" id="confirmModal"><div class="confirm-card"><h3 id="confirmTitle">Confirm action</h3><p id="confirmMessage"></p><div><button class="secondary-btn" id="confirmCancel">Cancel</button><button class="danger-btn" id="confirmOk">Delete</button></div></div></div>
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=3.6-company"></script>
+  <script src="app.js?v=3.6.2-tagline"></script>
   <script>if ('serviceWorker' in navigator) window.addEventListener('load',()=>navigator.serviceWorker.register('/service-worker.js').catch(()=>{}));</script>
 </body>
 </html>
