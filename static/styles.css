@@ -192,3 +192,43 @@ table{border-collapse:separate;border-spacing:0}th{background:rgba(255,255,255,.
 .stage-ring{box-shadow:0 9px 20px rgba(0,0,0,.28),inset 0 1px rgba(255,255,255,.16)}
 @media(max-width:760px){.chart-card:hover{transform:translateY(-2px)}.chart-card:after{animation:none}.chart-wrap,.donut-shell{filter:none}.chart-card canvas{filter:none}}
 @media(prefers-reduced-motion:reduce){.chart-card,.luxury-legend,.kpi-icon,.stage-card{transition:none}.chart-card:after{animation:none}}
+
+/* ===== RTL / Arabic support (Phase 3.5) =====
+   The app-shell uses CSS grid, so the sidebar automatically moves to the
+   right when dir="rtl"; these rules fix the physical-direction details. */
+[dir="rtl"]{text-align:right}
+[dir="rtl"] input,[dir="rtl"] select,[dir="rtl"] textarea{text-align:right}
+/* Keep numbers, dates, currency and the OMR amounts in natural LTR flow. */
+[dir="rtl"] input[type="number"],[dir="rtl"] input[type="date"],[dir="rtl"] input[type="month"],[dir="rtl"] input[type="email"],[dir="rtl"] input[type="tel"],[dir="rtl"] input[type="search"]{direction:ltr;text-align:right}
+[dir="rtl"] .sidebar{box-shadow:-14px 0 45px rgba(0,0,0,.2);border-right:0;border-left:1px solid rgba(213,179,107,.11)}
+[dir="rtl"] .top-actions{margin-left:0;margin-right:auto}
+[dir="rtl"] .period-strip button{margin-left:0;margin-right:auto}
+[dir="rtl"] .chart-card .panel-head:after{left:auto;right:0}
+[dir="rtl"] .login-logo{margin-left:0;margin-right:-4px}
+[dir="rtl"] .luxury-legend:hover{transform:translateX(-2px)}
+[dir="rtl"] .plan-card b{text-align:right}
+@media(max-width:860px){
+  [dir="rtl"] .sidebar{left:auto;right:-280px}
+  [dir="rtl"] .sidebar.open{right:0}
+}
+@media(max-width:620px){
+  [dir="rtl"] .period-strip button{margin-right:0}
+  [dir="rtl"] .top-actions{margin-left:0;margin-right:auto}
+  [dir="rtl"] .notification-dropdown{right:12px;left:12px}
+}
+
+/* ===== Global select / dropdown readability (dark theme) =====
+   The closed control is already dark; native <option> popups otherwise fall
+   back to a white background with the inherited light text, making options
+   unreadable. Force a consistent dark popup with high-contrast text. Applies
+   to every <select> in the app (filters, user menu, language, modals) in both
+   LTR and RTL. */
+select{color:var(--text);background-color:#121b29}
+select option,select optgroup{background-color:#121b29;color:#e9edf1}
+select option:disabled{color:var(--muted)}
+/* Selected / active option highlight — readable in dark theme. */
+select option:checked,
+select option[selected]{background:#1d2940;color:#fff}
+/* Chrome/Blink hover highlight for option items. */
+select option:hover,
+select option:focus{background:#243450;color:#fff}

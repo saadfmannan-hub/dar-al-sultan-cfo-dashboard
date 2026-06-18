@@ -157,6 +157,28 @@ def now_iso() -> str:
     return datetime.now().replace(microsecond=0).isoformat(sep=" ")
 
 
+SUPPORTED_LANGUAGES = ("en", "ar")
+DEFAULT_LANGUAGE = "en"
+
+
+def normalize_language(value: Any, fallback: str = DEFAULT_LANGUAGE) -> str:
+    code = str(value or "").strip().lower()
+    return code if code in SUPPORTED_LANGUAGES else fallback
+
+
+def get_setting(conn: sqlite3.Connection, key: str, default: str = "") -> str:
+    row = conn.execute("SELECT value FROM app_settings WHERE key=?", (key,)).fetchone()
+    return row["value"] if row else default
+
+
+def set_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
+    conn.execute(
+        "INSERT INTO app_settings(key,value) VALUES (?,?) "
+        "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        (key, value),
+    )
+
+
 def month_name(month_key: str) -> str:
     dt = datetime.strptime(month_key, "%Y-%m")
     return dt.strftime("%B %Y")
@@ -210,6 +232,8 @@ def migrate_schema(conn: sqlite3.Connection) -> None:
     ensure_column(conn, "membership_cards", "sales_agent_name", "TEXT NOT NULL DEFAULT ''")
     ensure_column(conn, "membership_cards", "commission_rate", "REAL NOT NULL DEFAULT 10")
     ensure_column(conn, "membership_cards", "commission_amount", "REAL NOT NULL DEFAULT 0")
+    # Phase 3.5: per-user interface language preference (en/ar).
+    ensure_column(conn, "users", "language", "TEXT NOT NULL DEFAULT 'en'")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_membership_agent_issue ON membership_cards(sales_agent_id,issue_date)")
     conn.execute("""UPDATE membership_cards SET sales_agent_name=COALESCE((SELECT name FROM employees WHERE employees.id=membership_cards.sales_agent_id),'')
                     WHERE TRIM(COALESCE(sales_agent_name,''))='' AND sales_agent_id IS NOT NULL""")
@@ -657,6 +681,11 @@ def init_db() -> None:
                 created_at TEXT NOT NULL,
                 FOREIGN KEY(user_id) REFERENCES users(id)
             );
+
+            CREATE TABLE IF NOT EXISTS app_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL DEFAULT ''
+            );
             """
         )
         migrate_schema(conn)
@@ -664,6 +693,10 @@ def init_db() -> None:
 
 
 def seed_data(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        "INSERT OR IGNORE INTO app_settings(key,value) VALUES (?,?)",
+        ("default_language", DEFAULT_LANGUAGE),
+    )
     for branch in ("Al Khoud", "Azaiba", "Nizwa"):
         conn.execute("INSERT OR IGNORE INTO branches(name) VALUES (?)", (branch,))
 
@@ -1047,12 +1080,16 @@ class AppHandler(BaseHTTPRequestHandler):
                 self.serve_static()
                 return
             if path == "/api/health":
+                with db_connect() as conn:
+                    default_language = normalize_language(get_setting(conn, "default_language", DEFAULT_LANGUAGE))
                 self.send_json({
                     "ok": True,
                     "version": APP_VERSION,
                     "cloud_mode": CLOUD_MODE,
                     "demo_mode": DEMO_MODE,
                     "database": "SQLite demo" if DEMO_MODE else "SQLite local",
+                    "default_language": default_language,
+                    "supported_languages": list(SUPPORTED_LANGUAGES),
                     "time": now_iso(),
                 })
                 return
@@ -1061,8 +1098,11 @@ class AppHandler(BaseHTTPRequestHandler):
                 return
             if path == "/api/me":
                 safe = {k: user[k] for k in ("id","username","full_name","role","branch","active")}
+                safe["language"] = normalize_language(user.get("language"))
                 safe["permissions"] = sorted(self.permissions_for_role(user["role"]))
                 self.send_json({"ok": True, "user": safe})
+            elif path == "/api/settings":
+                self.handle_settings_get(user)
             elif path == "/api/branches":
                 with db_connect() as conn:
                     branches = [dict(r) for r in conn.execute("SELECT id,name FROM branches WHERE active=1 ORDER BY id")]
@@ -1150,6 +1190,10 @@ class AppHandler(BaseHTTPRequestHandler):
                 return
             if path == "/api/logout":
                 self.handle_logout(user)
+            elif path == "/api/me/language":
+                self.handle_user_language_save(user)
+            elif path == "/api/settings":
+                self.handle_settings_save(user)
             elif path == "/api/notifications/read":
                 self.handle_notification_read(user)
             elif path == "/api/notifications/settings":
@@ -1281,6 +1325,7 @@ class AppHandler(BaseHTTPRequestHandler):
         cookie_secure = "; Secure" if CLOUD_MODE else ""
         headers = {"Set-Cookie": f"das_session={token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=43200{cookie_secure}"}
         safe = {k: user[k] for k in ("id","username","full_name","role","branch","active")}
+        safe["language"] = normalize_language(user.get("language"))
         safe["permissions"] = sorted(self.permissions_for_role(user["role"]))
         self.send_json({"ok": True, "user": safe}, headers=headers)
 
@@ -1292,6 +1337,38 @@ class AppHandler(BaseHTTPRequestHandler):
         with db_connect() as conn:
             log_audit(conn, user, "LOGOUT", "Authentication", user["id"], "User logged out")
         self.send_json({"ok": True}, headers={"Set-Cookie": f"das_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0{'; Secure' if CLOUD_MODE else ''}"})
+
+    def handle_user_language_save(self, user: dict[str, Any]) -> None:
+        data = self.parse_json()
+        language = normalize_language(data.get("language"), fallback="")
+        if not language:
+            raise ValueError("Unsupported language")
+        with db_connect() as conn:
+            conn.execute("UPDATE users SET language=? WHERE id=?", (language, user["id"]))
+        user["language"] = language
+        self.send_json({"ok": True, "language": language})
+
+    def handle_settings_get(self, user: dict[str, Any]) -> None:
+        with db_connect() as conn:
+            default_language = normalize_language(get_setting(conn, "default_language", DEFAULT_LANGUAGE))
+        self.send_json({
+            "ok": True,
+            "default_language": default_language,
+            "supported_languages": list(SUPPORTED_LANGUAGES),
+            "can_manage": self.has_permission(user, "users"),
+        })
+
+    def handle_settings_save(self, user: dict[str, Any]) -> None:
+        if not self.require_permission(user, "users"):
+            return
+        data = self.parse_json()
+        language = normalize_language(data.get("default_language"), fallback="")
+        if not language:
+            raise ValueError("Unsupported language")
+        with db_connect() as conn:
+            set_setting(conn, "default_language", language)
+            log_audit(conn, user, "UPDATE", "Settings", "default_language", f"Set company default language to {language}")
+        self.send_json({"ok": True, "default_language": language})
 
     def handle_dashboard(self, user: dict[str, Any]) -> None:
         if not self.require_permission(user, "dashboard"):
@@ -3840,7 +3917,7 @@ class AppHandler(BaseHTTPRequestHandler):
     def handle_users(self,user:dict[str,Any])->None:
         if not self.require_permission(user,"users"):return
         with db_connect() as conn:
-            rows=[dict(r) for r in conn.execute("SELECT id,username,full_name,role,branch,active,created_at FROM users ORDER BY id")]
+            rows=[dict(r) for r in conn.execute("SELECT id,username,full_name,role,branch,active,language,created_at FROM users ORDER BY id")]
             roles=[dict(r) for r in conn.execute("SELECT id,name,description,active,created_at,updated_at FROM roles ORDER BY name")]
             for role in roles:
                 role["permissions"]=[r["permission"] for r in conn.execute("SELECT permission FROM role_permissions WHERE role_id=? ORDER BY permission",(role["id"],))]
@@ -3899,13 +3976,13 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def handle_user_create(self,user:dict[str,Any])->None:
         if not self.require_permission(user,"users"):return
-        data=self.parse_json();username=str(data.get("username","")).strip().lower();full_name=str(data.get("full_name","")).strip();password=str(data.get("password",""));role=str(data.get("role","Viewer"));branch=str(data.get("branch","All"))
+        data=self.parse_json();username=str(data.get("username","")).strip().lower();full_name=str(data.get("full_name","")).strip();password=str(data.get("password",""));role=str(data.get("role","Viewer"));branch=str(data.get("branch","All"));language=normalize_language(data.get("language"))
         if not username or not full_name or len(password)<8:raise ValueError("Username, full name and password of at least 8 characters are required")
         with db_connect() as conn:
             role_row=conn.execute("SELECT * FROM roles WHERE name=? AND active=1",(role,)).fetchone()
             if not role_row:raise ValueError("Invalid or inactive role")
             salt,digest=hash_password(password)
-            cur=conn.execute("INSERT INTO users(username,full_name,password_hash,salt,role,branch,created_at) VALUES (?,?,?,?,?,?,?)",(username,full_name,digest,salt,role,branch,now_iso()))
+            cur=conn.execute("INSERT INTO users(username,full_name,password_hash,salt,role,branch,language,created_at) VALUES (?,?,?,?,?,?,?,?)",(username,full_name,digest,salt,role,branch,language,now_iso()))
             log_audit(conn,user,"CREATE","Users",cur.lastrowid,f"Created {username} as {role}")
         self.send_json({"ok":True,"id":cur.lastrowid},201)
 
@@ -3915,11 +3992,11 @@ class AppHandler(BaseHTTPRequestHandler):
         with db_connect() as conn:
             existing=conn.execute("SELECT * FROM users WHERE id=?",(user_id,)).fetchone()
             if not existing:self.send_error_json("User not found",404);return
-            full_name=str(data.get("full_name",existing["full_name"]));role=str(data.get("role",existing["role"]));branch=str(data.get("branch",existing["branch"]));active=int(bool(data.get("active",existing["active"])))
+            full_name=str(data.get("full_name",existing["full_name"]));role=str(data.get("role",existing["role"]));branch=str(data.get("branch",existing["branch"]));active=int(bool(data.get("active",existing["active"])));language=normalize_language(data.get("language",existing["language"]))
             role_row=conn.execute("SELECT * FROM roles WHERE name=? AND active=1",(role,)).fetchone()
             if not role_row:raise ValueError("Invalid or inactive role")
             if user_id==user["id"] and not active:raise ValueError("You cannot deactivate your own account")
-            conn.execute("UPDATE users SET full_name=?,role=?,branch=?,active=? WHERE id=?",(full_name,role,branch,active,user_id))
+            conn.execute("UPDATE users SET full_name=?,role=?,branch=?,active=?,language=? WHERE id=?",(full_name,role,branch,active,language,user_id))
             if data.get("password"):
                 password=str(data["password"])
                 if len(password)<8:raise ValueError("Password must have at least 8 characters")
