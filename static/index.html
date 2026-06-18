@@ -8,8 +8,8 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/png" href="favicon.png" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css?v=3.6.2-tagline" />
-  <script src="i18n.js?v=3.6.2-tagline"></script>
+  <link rel="stylesheet" href="styles.css?v=3.7-exec" />
+  <script src="i18n.js?v=3.7-exec"></script>
 </head>
 <body>
   <div class="cloud-demo-banner" id="cloudDemoBanner">CLOUD DEMO · SAMPLE DATA · OWNER PRESENTATION VERSION</div>
@@ -106,16 +106,17 @@
       </header>
 
       <section class="page active" id="dashboard">
-        <div class="section-heading">
-          <div><span class="eyebrow">EXECUTIVE OVERVIEW</span><h3>Business Performance</h3></div>
-          <div class="date-chip">Wednesday, 10 June 2026</div>
-        </div>
+        <div class="exec-hero" id="execHero"></div>
         <div class="period-strip">
           <div><span>Last completed month</span><strong>May 2026 · Locked</strong></div>
           <div><span>Current month-to-date</span><strong>June 1–10, 2026</strong></div>
           <button class="secondary-btn" id="refreshDashboard">Refresh Dashboard</button>
         </div>
         <div class="kpi-grid" id="dashboardKpis"></div>
+        <article class="panel exec-health-panel">
+          <div class="panel-head"><div><span class="eyebrow">BUSINESS HEALTH SCORE</span><h3>Overall Performance Index</h3></div><span class="metric-chip" id="execHealthChip">Live</span></div>
+          <div class="exec-health-band" id="execHealthBand"></div>
+        </article>
         <div class="analytics-grid executive-analytics-grid">
           <article class="panel analytics-wide">
             <div class="panel-head"><div><span class="eyebrow">MONTHLY TREND</span><h3 id="chartTitle">Income vs Expenses</h3></div><select class="control compact" id="chartMetric"><option value="financial">Financial</option><option value="production">Produced Pcs</option></select></div>
@@ -146,6 +147,17 @@
           <article class="panel executive-highlights-panel">
             <div class="panel-head"><div><span class="eyebrow">MANAGEMENT PULSE</span><h3>Executive Highlights</h3></div></div>
             <div class="executive-highlights" id="executiveHighlights"></div>
+          </article>
+        </div>
+        <div class="analytics-grid exec-bottom-grid">
+          <article class="panel exec-alerts-panel" data-permission="alert_read">
+            <div class="panel-head"><div><span class="eyebrow">ALERTS CENTER</span><h3>Priority Notifications</h3></div><button class="link-btn" id="execAlertsViewAll">Open Alerts & Control</button></div>
+            <div class="exec-alerts-summary" id="execAlertsSummary"></div>
+            <div class="exec-alerts-list" id="execAlertsList"></div>
+          </article>
+          <article class="panel exec-actions-panel">
+            <div class="panel-head"><div><span class="eyebrow">EXECUTIVE QUICK ACTIONS</span><h3>Shortcuts</h3></div></div>
+            <div class="exec-actions-grid" id="execQuickActions"></div>
           </article>
         </div>
         <article class="panel">
@@ -922,7 +934,7 @@
 
   <div class="confirm-modal" id="confirmModal"><div class="confirm-card"><h3 id="confirmTitle">Confirm action</h3><p id="confirmMessage"></p><div><button class="secondary-btn" id="confirmCancel">Cancel</button><button class="danger-btn" id="confirmOk">Delete</button></div></div></div>
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=3.6.2-tagline"></script>
+  <script src="app.js?v=3.7-exec"></script>
   <script>if ('serviceWorker' in navigator) window.addEventListener('load',()=>navigator.serviceWorker.register('/service-worker.js').catch(()=>{}));</script>
 </body>
 </html>
